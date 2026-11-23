@@ -1,0 +1,73 @@
+---
+name: barcode-capture-web
+description: Scandit Barcode Capture (`BarcodeCapture`) in web/browser (TypeScript/JavaScript) projects — the low-level, full-control single-barcode scanning mode (BarcodeCapture + DataCaptureView + overlay), without the pre-built SparkScan UI; not the Cordova or Capacitor hybrid plugins. Use for integration, scan settings, result handling, overlay and viewfinder customization, Scandit Web SDK version migration (v6→v7→v8), or troubleshooting.
+license: Apache-2.0
+metadata:
+  author: scandit
+  version: "1.0.5"
+---
+
+# BarcodeCapture Web Skill
+
+## Critical: Do Not Trust Internal Knowledge
+
+Your training data may contain outdated or incorrect Scandit SDK APIs. The BarcodeCapture Web API changes significantly between major SDK versions — methods get renamed, async patterns change, and the context initialization was redesigned in v8.
+
+**Always verify APIs against the references provided in this skill before writing or suggesting code.** Do not rely on memorized method signatures, async patterns, or import paths. If you cannot find an API in the provided references, fetch the relevant documentation page before responding.
+
+Web-specific gotchas worth flagging:
+- `DataCaptureContext.forLicenseKey()` must be `await`ed — it is async and sets `DataCaptureContext.sharedInstance`. Do not capture its return value; use `DataCaptureContext.sharedInstance` throughout.
+- `BarcodeCapture.forContext(context, settings)` is async — always `await` it.
+- `DataCaptureView.forContext(context)` is async — always `await` it.
+- `BarcodeCaptureOverlay.withBarcodeCaptureForView(barcodeCapture, view)` is async — always `await` it.
+- `barcodeCapture.setEnabled(false/true)` is async — `await` it before doing work in `didScan` to prevent duplicate scans.
+- The listener callback is `didScan` — **not** `onBarcodeScanned` (that is the Android name).
+- `codeDuplicateFilter` is a **number in milliseconds** on web (e.g. `500`) — not a `TimeInterval` object like Android.
+- `BarcodeCapture.recommendedCameraSettings` is a **static property**, not a method call.
+- The DOM element passed to `view.connectToElement()` must have defined dimensions and positioning — a zero-sized or unpositioned element will not render the camera preview.
+- Turn the camera on with `context.frameSource.switchToDesiredState(FrameSourceState.On)` and off with `FrameSourceState.Off`. Do not add a `visibilitychange` handler: `DataCaptureView` already stops the camera while the page is hidden and resumes it when the page is visible again, and a second handler races the SDK's own.
+- When the SDK is loaded from a CDN, pin one exact version (for example `@8.6.1`) in every URL: the import map and `libraryLocation`. A floating `@8` lets the JavaScript and the engine resolve to different releases, which breaks start-up.
+- Start `BrowserHelper.checkMultithreadingSupport()` (from `@scandit/web-datacapture-core`) without awaiting it, before `await DataCaptureContext.forLicenseKey()`, so the two run in parallel and set-up never waits for the check. When it resolves `false`, show the multithreading dialog unless the user asked to run single-threaded: import `showMultithreadingWarning` from the `multithreading-warning` helper module in references/integration.md, which needs no page markup. In React, render the same dialog from component state instead of importing the helper. The dialog shows at most once per page load and honors the "don't show again this session" checkbox. COEP `credentialless` is not a request to run single-threaded: Safari does not support it, so the dialog still shows there.
+- `DataCaptureContext.forLicenseKey()` is idempotent, so calling it again is safe. `dispose()` releases the context, its engine and the camera: call `forLicenseKey()` again before scanning after it.
+
+## Intent Routing
+
+Based on the user's request, load the appropriate reference file before responding:
+
+- **Integrating BarcodeCapture from scratch, configuring settings, customizing feedback or overlay, adding a viewfinder, handling scans, or doing async work after a scan** (e.g. "add BarcodeCapture to my app", "set up barcode scanning", "how do I use BarcodeCapture in web", "filter duplicate scans", "suppress the beep", "add a viewfinder", "disable scanning while I look up the barcode") → read [references/integration.md](references/integration.md) and follow the instructions there.
+- **Migrating or upgrading an existing BarcodeCapture integration** (e.g. "upgrade from v6 to v7", "migrate my BarcodeCapture", "bump the Scandit SDK to v8", "what changed between SDK versions") → read [references/migration.md](references/migration.md) and follow the instructions there.
+
+## API Usage Policy
+
+Only use APIs that are explicitly documented in the Scandit references below. Do not invent or guess method signatures, parameters, or property names. If unsure whether an API exists or how it is called — or if a compile error occurs — fetch the relevant reference page before responding. Do not tell the user to check the docs themselves. After answering, always include the relevant link so the user can explore further.
+
+**Never construct or guess documentation URLs.** When you need a specific class or property's API page:
+1. First check whether the page you already fetched contains a direct hyperlink to it — topic pages link directly to relevant API symbols. Always request links alongside content in your fetch prompt.
+2. If no direct link was found, fetch the API index (see **Full API reference** in the table below), extract the actual link from it, and follow that.
+
+URL structures can vary (e.g. `api/ui/` subdirectory) and guessing will lead to 404s.
+
+## Licence key
+
+Scanning needs a Scandit licence key. For this skill the licence product is `sdk` and the licence platform is `webassembly`.
+
+Work through these in order — never block the user on MCP:
+
+1. **The Scandit MCP server is connected** — call `ensure_scanner_setup` with product `sdk` and platforms `webassembly`, `app_identifier` (the app's bundle or application id; for web, its production domain, never `localhost`) and `env_var` `SCANDIT_LICENSE_KEY`. Do not run the command it returns. Then call `get_license_key` with the key's id, from that result or from `list_license_keys`; if `list_license_keys` shows the key is not a trial, ask the user before fetching it. Show at most a masked preview in chat; never print a full key.
+2. **It is not connected** — tell the user once that they can connect the remote Scandit MCP server, `https://ssl.scandit.com/mcp`, in their MCP client, then continue from step 1. Do not edit MCP client configuration yourself.
+
+   Authentication is browser-based, so it is **not supported headless or in CI**. The server provisions **trial** keys only; it never creates, revokes, or modifies production licences.
+3. **The user declines, or has no MCP client** — they generate a key themselves at <https://ssl.scandit.com> (no account yet: <https://ssl.scandit.com/dashboard/sign-up?p=test>) and paste it in.
+
+**Then put the key into the code**: write it into the licence-key call in place of the placeholder — the key `get_license_key` returned, or the one the user pastes or gives you — still showing only a masked preview in chat. Do not search the project, its files or the environment for a key.
+
+## References
+
+Direct users to the right resource based on their question:
+
+| Topic | Resource |
+|---|---|
+| Get Started | [Get Started](https://docs.scandit.com/sdks/web/barcode-capture/get-started/) · [Sample](https://github.com/Scandit/datacapture-web-samples/tree/master/01_Single_Scanning_Samples/02_Barcode_Scanning_with_Low_Level_API/BarcodeCaptureSimpleSample) |
+| Advanced topics (viewfinders, location selection, feedback, duplicate filtering, composite codes) | [Advanced Configurations](https://docs.scandit.com/sdks/web/barcode-capture/advanced/) |
+| Migration between major SDK versions | [6 → 7](https://docs.scandit.com/sdks/web/migrate-6-to-7/) · [7 → 8](https://docs.scandit.com/sdks/web/migrate-7-to-8/) |
+| Full API reference | [BarcodeCapture API](https://docs.scandit.com/data-capture-sdk/web/barcode-capture/api.html) |

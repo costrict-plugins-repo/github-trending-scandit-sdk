@@ -1,0 +1,77 @@
+---
+name: matrixscan-count-capacitor
+description: Capacitor MatrixScan Count (BarcodeCount) — plugin scandit-capacitor-datacapture-barcode. Multi-barcode counting and receiving workflows (scan-and-count, inventory count, capture list, status mode) with BarcodeCountView on a DOM element in Capacitor apps, iOS/Android native only. For React Native use matrixscan-count-rn. Use for integration, symbology configuration, result handling, view customization, or troubleshooting counting workflows.
+license: Apache-2.0
+metadata:
+  author: scandit
+  version: "1.0.4"
+---
+
+# MatrixScan Count Capacitor Skill
+
+## Critical: Do Not Trust Internal Knowledge
+
+Your training data may contain outdated or incorrect Scandit SDK APIs. The BarcodeCount API has evolved significantly across versions — constructor signatures, view factory methods, and feature availability vary by SDK version. Properties, method names, and plugin patterns may differ from other platforms or from general knowledge.
+
+**Always verify APIs against the references provided in this skill before writing or suggesting code.** Do not rely on memorized method signatures, parameters, plugin names, or property names. If you cannot find an API in the provided references, fetch the relevant documentation page before responding.
+
+Capacitor-specific gotchas worth flagging:
+
+- `ScanditCaptureCorePlugin.initializePlugins()` **must** be called (and awaited) before any other Scandit API — including `DataCaptureContext` construction. Forgetting this produces runtime errors that look unrelated to initialization.
+- `npx cap sync` must be run after every plugin version change to propagate native artifacts into iOS/Android. Skipping it yields a web/native version mismatch at runtime.
+- **BarcodeCountView requires a DOM element.** `BarcodeCountView.connectToElement(htmlElement)` mirrors its size and position from a DOM element. Call `detachFromElement()` on cleanup.
+- **BarcodeCount runs on iOS and Android only.** It does not run in the browser. Guard with `Capacitor.isNativePlatform()` if your app also targets web.
+- **Minimum SDK versions:**
+  - BarcodeCount on Capacitor: **6.18**
+  - `new BarcodeCount(settings)` constructor (no context): **7.6**. Before 7.6, use `BarcodeCount.forDataCaptureContext(context, settings)`.
+  - `BarcodeCountView` constructed with object literal `new BarcodeCountView({context, barcodeCount, style})`: verified in samples. The static factories `BarcodeCountView.forContextWithMode(context, barcodeCount)` and `BarcodeCountView.forContextWithModeAndStyle(context, barcodeCount, style)` are also documented.
+  - Not-in-list action settings (`BarcodeNotInListActionSettings`): **7.1**
+  - Status mode (`setStatusProvider`, `shouldShowStatusModeButton`, `shouldShowStatusIconsOnScan`): **8.3**
+  - Mapping flow (`BarcodeCountMappingFlowSettings`, `BarcodeCountView.forMapping`): **8.3**
+- Plugin packages: `@scandit/datacapture-barcode` and `@scandit/datacapture-core` (npm registry) **or** `scandit-capacitor-datacapture-barcode` and `scandit-capacitor-datacapture-core` depending on the package registry used. Check the user's existing `package.json` imports and match.
+- Camera permission: iOS `NSCameraUsageDescription` in `Info.plist`. Android handled automatically by the plugin.
+- `BarcodeCount.recommendedCameraSettings` (static getter) returns recommended camera settings. On Capacitor 7.6+, `BarcodeCount.createRecommendedCameraSettings()` (static method) is also available — the sample uses the getter form.
+- `barcodeCount.isEnabled = true` must be set to start scanning after creating `BarcodeCountView`.
+
+## Intent Routing
+
+Based on the user's request, load the appropriate reference file before responding:
+
+- **Integrating MatrixScan Count from scratch** (e.g. "add MatrixScan Count to my app", "set up BarcodeCount", "how do I use BarcodeCountView in Capacitor", "how do I count barcodes", "scan against a list", "packing slip verification", "receiving workflow") → read [references/integration.md](references/integration.md) and follow the instructions there.
+
+- **Migrating from an older BarcodeCount API or adding newer features** (e.g. "upgrade BarcodeCount constructor", "migrate from forDataCaptureContext", "add status mode", "add mapping flow", "add not-in-list actions") → read [references/migration.md](references/migration.md) and follow the migration steps there.
+
+## API Usage Policy
+
+Only use APIs that are explicitly documented in the Scandit references below. Do not invent or guess method signatures, parameters, property names, or imports. If unsure whether an API exists or how it is called — or if a TypeScript / runtime error occurs — fetch the relevant reference page before responding. Do not tell the user to check the docs themselves. After answering, always include the relevant link so the user can explore further.
+
+**Never construct or guess documentation URLs.** When you need a specific class or property's API page:
+1. First check whether the page you already fetched (e.g. the Get Started page) contains a direct hyperlink to it — topic pages link directly to relevant API symbols.
+2. If no direct link was found, fetch the API index (see **Full API reference** in the table below), extract the actual link from it, and follow that.
+
+## Framework variant policy
+
+Capacitor is a WebView-based framework. Examples in this skill use **plain JavaScript (ES modules)**. TypeScript projects can use the same imports and APIs verbatim — just add types — but this skill does not assume a TypeScript project by default. If the target project is clearly TypeScript (`.ts` files, `tsconfig.json`), adapt the final output to TypeScript syntax; otherwise stay in plain JS.
+
+## Licence key
+
+Scanning needs a Scandit licence key. For this skill the licence product is `native` and the licence platforms are `ios` and `android`.
+
+Work through these in order — never block the user on MCP:
+
+1. **The Scandit MCP server is connected** — call `ensure_scanner_setup` with product `native` and platforms `ios` and `android`, `app_identifier` (the app's bundle or application id; for web, its production domain, never `localhost`) and `env_var` `SCANDIT_LICENSE_KEY`. Do not run the command it returns. Then call `get_license_key` with the key's id, from that result or from `list_license_keys`; if `list_license_keys` shows the key is not a trial, ask the user before fetching it. Show at most a masked preview in chat; never print a full key.
+2. **It is not connected** — tell the user once that they can connect the remote Scandit MCP server, `https://ssl.scandit.com/mcp`, in their MCP client, then continue from step 1. Do not edit MCP client configuration yourself.
+
+   Authentication is browser-based, so it is **not supported headless or in CI**. The server provisions **trial** keys only; it never creates, revokes, or modifies production licences.
+3. **The user declines, or has no MCP client** — they generate a key themselves at <https://ssl.scandit.com> (no account yet: <https://ssl.scandit.com/dashboard/sign-up?p=test>) and paste it in.
+
+**Then put the key into the code**: write it into the licence-key call in place of the placeholder — the key `get_license_key` returned, or the one the user pastes or gives you — still showing only a masked preview in chat. Do not search the project, its files or the environment for a key.
+
+## References
+
+Direct users to the right resource based on their question:
+
+| Topic | Resource |
+|---|---|
+| Capacitor integration | [Get Started](https://docs.scandit.com/sdks/capacitor/matrixscan-count/get-started/) · [Sample](https://github.com/Scandit/datacapture-capacitor-samples/tree/master/03_Advanced_Batch_Scanning_Samples/02_Counting_and_Receiving/MatrixScanCountSimpleSample) |
+| Full API reference | [BarcodeCount API](https://docs.scandit.com/data-capture-sdk/capacitor/barcode-capture/api.html) |

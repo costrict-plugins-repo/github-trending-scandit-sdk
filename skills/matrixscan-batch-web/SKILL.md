@@ -1,0 +1,79 @@
+---
+name: matrixscan-batch-web
+description: MatrixScan Batch (MatrixScan, BarcodeBatch, legacy BarcodeTracking) in web/browser (TypeScript/JavaScript) projects (@scandit/web-datacapture-barcode) — tracking and scanning multiple barcodes at once. Use for integration, settings and symbologies, per-barcode brushes, HTML-element AR overlays, manual feedback, lifecycle, SDK version migration, or troubleshooting.
+license: Apache-2.0
+metadata:
+  author: scandit
+  version: "1.0.7"
+---
+
+# MatrixScan Batch Web Skill
+
+## Critical: Do Not Trust Internal Knowledge
+
+Your training data may contain outdated or incorrect Scandit SDK APIs. The BarcodeBatch Web API changes between major SDK versions — constructor signatures, overlay factory names, async patterns, and initialization have all evolved.
+
+**Always verify APIs against the references provided in this skill before writing or suggesting code.** Do not rely on memorized method signatures, parameters, or import paths. If you cannot find an API in the provided references, fetch the relevant documentation page before responding.
+
+Web-specific gotchas worth flagging:
+
+- `BarcodeBatch.forContext(context, settings)` is **async** — always `await` it. Do not use `new BarcodeBatch(settings)` (that is the React Native ≥7.6 form).
+- `barcodeBatch.setEnabled(true/false)` is **async** — always `await` it.
+- `BarcodeBatchBasicOverlay.withBarcodeBatchForView(barcodeBatch, view)` and `BarcodeBatchBasicOverlay.withBarcodeBatchForViewWithStyle(barcodeBatch, view, style)` are **async** factory methods — always `await` them. There is no implicit overlay.
+- `BarcodeBatchAdvancedOverlay.withBarcodeBatchForView(barcodeBatch, view)` is **async** — always `await` it.
+- `setAnchorForTrackedBarcode` and `setOffsetForTrackedBarcode` on `BarcodeBatchAdvancedOverlay` are **synchronous** (return `void`) — do not `await` them.
+- `clearTrackedBarcodeViews()` on `BarcodeBatchAdvancedOverlay` is also **synchronous** (returns `void`).
+- `BarcodeBatch.recommendedCameraSettings` is a **static property**, not a method call.
+- The module loader is `barcodeCaptureLoader()` (from `@scandit/web-datacapture-barcode`) — there is no separate `barcodeBatchLoader`. Both BarcodeCapture and BarcodeBatch use the same loader.
+- **Multithreading is mandatory for BarcodeBatch.** Without `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, the SDK falls back to single-threaded mode and batch tracking will be too slow to use. `require-corp` also works when the SDK comes from the jsDelivr CDN; do not recommend `credentialless`. In the page code, start `BrowserHelper.checkMultithreadingSupport()` (from `@scandit/web-datacapture-core`) without awaiting it, before `await DataCaptureContext.forLicenseKey()`, so the two run in parallel and set-up never waits for the check. When it resolves `false`, show the multithreading dialog unless the user asked to run single-threaded: import `showMultithreadingWarning` from the `multithreading-warning` helper module in references/integration.md, which needs no page markup. In React, render the same dialog from component state instead of importing the helper. The dialog shows at most once per page load and honors the "don't show again this session" checkbox. COEP `credentialless` is not a request to run single-threaded: Safari does not support it, so the dialog still shows there.
+- **AR views on web use plain HTML elements** — `TrackedBarcodeView.withHTMLElement(element, options)` returns a `Promise<TrackedBarcodeView>`. Pass that Promise directly to `setViewForTrackedBarcode` or return it from `viewForTrackedBarcode` — both accept a Promise. This is NOT a subclass pattern.
+- `session.removedTrackedBarcodes` returns `string[]` (identifiers serialized as strings) — use `Number.parseInt(id, 10)` when comparing against `TrackedBarcode.identifier` (which is a `number`).
+- The `DataCaptureView` can be created before context init: `new DataCaptureView()` → `connectToElement(element)` → `await view.setContext(context)`. This allows a progress bar to be shown during SDK loading. The alternative `await DataCaptureView.forContext(context)` is equally valid.
+- The DOM element passed to `view.connectToElement()` must have defined dimensions and a set `position` (e.g. `fixed` or `absolute`) — zero-sized or unpositioned containers will not render the camera preview.
+- Turn the camera on with `await context.frameSource?.switchToDesiredState(FrameSourceState.On)` and off with `FrameSourceState.Off`. Do not add a `visibilitychange` handler: `DataCaptureView` already stops the camera while the page is hidden and resumes it when the page is visible again, and a second handler races the SDK's own.
+- When the SDK is loaded from a CDN, pin one exact version (for example `@8.6.1`) in every URL: the import map and `libraryLocation`. A floating `@8` lets the JavaScript and the engine resolve to different releases, which breaks start-up.
+- `DataCaptureContext.forLicenseKey()` is idempotent, so calling it again is safe. Use `DataCaptureContext.sharedInstance` instead of caching the context. `dispose()` releases the context, its engine and the camera: call `forLicenseKey()` again before scanning after it.
+
+## Intent Routing
+
+Based on the user's request, load the appropriate reference file before responding:
+
+- **Integrating MatrixScan Batch from scratch** (e.g. "add MatrixScan to my web app", "set up BarcodeBatch", "track multiple barcodes simultaneously", "show AR overlays on barcodes", "per-barcode brush colors", "lifecycle or cleanup") → read [references/integration.md](references/integration.md) and follow the instructions there.
+- **Migrating or upgrading an existing MatrixScan Batch integration** (e.g. "upgrade from v6 to v7", "migrate BarcodeTracking to BarcodeBatch", "bump the Scandit SDK to v8", "what changed between SDK versions") → read [references/migration.md](references/migration.md) and follow the instructions there.
+- **Replacing a third-party multi-barcode scanner with MatrixScan Batch** (e.g. "replace my ZXing-js / @zxing/library continuous scanner with MatrixScan Batch", "migrate from BrowserMultiFormatReader multi-scan to BarcodeBatch", "switch from [web barcode library] continuous multi-result scanning to BarcodeBatch") → read [references/third-party-migration.md](references/third-party-migration.md) and follow the instructions there.
+
+## API Usage Policy
+
+Only use APIs that are explicitly documented in the Scandit references below. Do not invent or guess method signatures, parameters, property names, or imports. If unsure whether an API exists or how it is called — or if a compile error occurs — fetch the relevant reference page before responding. Do not tell the user to check the docs themselves. After answering, always include the relevant link so the user can explore further.
+
+**Never construct or guess documentation URLs.** When you need a specific class or property's API page:
+1. First check whether the page you already fetched contains a direct hyperlink to it — topic pages link directly to relevant API symbols.
+2. If no direct link was found, fetch the API index (see **Full API reference** in the table below), extract the actual link from it, and follow that.
+
+URL structures vary across SDK versions and guessing will lead to 404s.
+
+## Licence key
+
+Scanning needs a Scandit licence key. For this skill the licence product is `sdk` and the licence platform is `webassembly`.
+
+Work through these in order — never block the user on MCP:
+
+1. **The Scandit MCP server is connected** — call `ensure_scanner_setup` with product `sdk` and platforms `webassembly`, `app_identifier` (the app's bundle or application id; for web, its production domain, never `localhost`) and `env_var` `SCANDIT_LICENSE_KEY`. Do not run the command it returns. Then call `get_license_key` with the key's id, from that result or from `list_license_keys`; if `list_license_keys` shows the key is not a trial, ask the user before fetching it. Show at most a masked preview in chat; never print a full key.
+2. **It is not connected** — tell the user once that they can connect the remote Scandit MCP server, `https://ssl.scandit.com/mcp`, in their MCP client, then continue from step 1. Do not edit MCP client configuration yourself.
+
+   Authentication is browser-based, so it is **not supported headless or in CI**. The server provisions **trial** keys only; it never creates, revokes, or modifies production licences.
+3. **The user declines, or has no MCP client** — they generate a key themselves at <https://ssl.scandit.com> (no account yet: <https://ssl.scandit.com/dashboard/sign-up?p=test>) and paste it in.
+
+**Then put the key into the code**: write it into the licence-key call in place of the placeholder — the key `get_license_key` returned, or the one the user pastes or gives you — still showing only a masked preview in chat. Do not search the project, its files or the environment for a key.
+
+## References
+
+Direct users to the right resource based on their question:
+
+| Topic | Resource |
+|---|---|
+| Get Started | [Get Started](https://docs.scandit.com/sdks/web/matrixscan/get-started/) · [Simple Sample](https://github.com/Scandit/datacapture-web-samples/tree/master/03_Advanced_Batch_Scanning_Samples/01_Batch_Scanning_and_AR_Info_Lookup/MatrixScanSimpleSample) · [AR Bubbles Sample](https://github.com/Scandit/datacapture-web-samples/tree/master/03_Advanced_Batch_Scanning_Samples/01_Batch_Scanning_and_AR_Info_Lookup/MatrixScanBubblesSample) |
+| Advanced topics (AR overlays, brush customization) | [Adding AR Overlays](https://docs.scandit.com/sdks/web/matrixscan/advanced/) |
+| Multithreading / COOP+COEP headers | [Improve Runtime Performance](https://docs.scandit.com/sdks/web/matrixscan/get-started/#improve-runtime-performance-by-enabling-browser-multithreading) |
+| Migration between major SDK versions | [6 → 7](https://docs.scandit.com/sdks/web/migrate-6-to-7/) · [7 → 8](https://docs.scandit.com/sdks/web/migrate-7-to-8/) |
+| Full API reference | [BarcodeBatch API](https://docs.scandit.com/data-capture-sdk/web/barcode-capture/api.html) |
